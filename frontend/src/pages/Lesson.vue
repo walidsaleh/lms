@@ -2,26 +2,30 @@
 	<div v-if="lesson.data" class="">
 		<header
 			v-if="!embedded"
-			class="sticky top-0 z-10 flex items-center justify-between border-b bg-surface-white px-3 py-2.5 sm:px-5"
+			class="sticky top-0 z-10 flex items-center justify-between border-b bg-surface-base px-3 py-2.5 sm:px-5"
 		>
 			<Breadcrumbs class="h-7" :items="breadcrumbs" />
 			<div class="flex items-center gap-x-2">
 				<Tooltip v-if="canGoZen()" :text="__('Zen Mode')">
 					<Button @click="goFullScreen()">
 						<template #icon>
-							<Focus class="w-4 h-4 stroke-2" />
+							<span class="lucide-focus size-4" />
 						</template>
 					</Button>
 				</Tooltip>
-				<Button v-if="isAdmin" @click="showVideoStats()">
+				<Button
+					v-if="isAdmin && lessonHasVideo"
+					:tooltip="__('Video Statistics')"
+					@click="showVideoStats()"
+				>
 					<template #icon>
-						<TrendingUp class="size-4 stroke-1.5" />
+						<span class="lucide-trending-up size-4" />
 					</template>
 				</Button>
 				<CertificationLinks :courseName="courseName" />
 				<Button v-if="lesson.data.prev" @click="switchLesson('prev')">
 					<template #prefix>
-						<ChevronLeft class="w-4 h-4 stroke-1" />
+						<span class="lucide-chevron-left size-4" />
 					</template>
 					<span>
 						{{ __('Previous') }}
@@ -30,7 +34,7 @@
 
 				<Button v-if="lesson.data.next" @click="switchLesson('next')">
 					<template #suffix>
-						<ChevronRight class="w-4 h-4 stroke-1" />
+						<span class="lucide-chevron-right size-4" />
 					</template>
 					<span>
 						{{ __('Next') }}
@@ -60,8 +64,8 @@
 			<div v-if="lesson.data.no_preview" class="border-e">
 				<div class="shadow rounded-md w-3/4 mt-10 mx-auto text-center p-4">
 					<div class="flex items-center justify-center mt-4 gap-x-2">
-						<LockKeyholeIcon class="size-4 stroke-2 text-ink-gray-5" />
-						<div class="text-lg font-semibold text-ink-gray-7">
+						<span class="lucide-lock-keyhole size-4 text-ink-gray-5" />
+						<div class="text-xl-semibold text-ink-gray-7">
 							{{ __('This lesson is locked') }}
 						</div>
 					</div>
@@ -89,7 +93,7 @@
 					</Badge>
 					<Button v-else @click="redirectToLogin()">
 						<template #prefix>
-							<LogIn class="w-4 h-4 stroke-1" />
+							<span class="lucide-log-in size-4" />
 						</template>
 						{{ __('Login') }}
 					</Button>
@@ -98,7 +102,7 @@
 			<div
 				v-else
 				ref="lessonContainer"
-				class="bg-surface-white"
+				class="bg-surface-base"
 				:class="{
 					'overflow-y-auto': zenModeEnabled,
 				}"
@@ -114,7 +118,7 @@
 							class="flex flex-col space-y-3 md:space-y-0 md:flex-row md:items-center justify-between"
 						>
 							<div class="flex flex-col">
-								<div class="text-3xl font-semibold text-ink-gray-9">
+								<div class="text-5xl-semibold text-ink-gray-9">
 									{{ lesson.data.title }}
 								</div>
 
@@ -126,7 +130,7 @@
 										{{ lesson.data.chapter_title }} -
 										{{ lesson.data.course_title }}
 									</span>
-									<Info class="size-3" />
+									<span class="lucide-info size-3" />
 									<div
 										class="hidden group-hover:block rounded bg-gray-900 px-2 py-1 text-xs text-white shadow-xl absolute start-0 top-full mt-2"
 									>
@@ -142,12 +146,12 @@
 							>
 								<Button @click="showDiscussionsInZenMode()">
 									<template #icon>
-										<MessageCircleQuestion class="w-4 h-4 stroke-1.5" />
+										<span class="lucide-message-circle-question size-4" />
 									</template>
 								</Button>
 								<Button v-if="lesson.data.prev" @click="switchLesson('prev')">
 									<template #prefix>
-										<ChevronLeft class="w-4 h-4 stroke-1" />
+										<span class="lucide-chevron-left size-4" />
 									</template>
 									<span>
 										{{ __('Previous') }}
@@ -156,7 +160,7 @@
 
 								<Button v-if="lesson.data.next" @click="switchLesson('next')">
 									<template #suffix>
-										<ChevronRight class="w-4 h-4 stroke-1" />
+										<span class="lucide-chevron-right size-4" />
 									</template>
 									<span>
 										{{ __('Next') }}
@@ -317,16 +321,6 @@ import {
 } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
-	ChevronLeft,
-	ChevronRight,
-	LockKeyholeIcon,
-	LogIn,
-	Focus,
-	Info,
-	MessageCircleQuestion,
-	TrendingUp,
-} from 'lucide-vue-next'
-import {
 	getEditorTools,
 	enablePlyr,
 	highlightText,
@@ -416,9 +410,18 @@ defineExpose({
 	hasNext: computed(() => Boolean(lesson.data?.next)),
 })
 
+let collapsedByLesson = false
+const isCourseAdmin = () =>
+	Boolean(user.data?.is_moderator || user.data?.is_instructor)
+
 onMounted(() => {
 	startTimer()
-	if (!props.embedded) sidebarStore.isSidebarCollapsed = true
+	// Keep the app sidebar open for admins/instructors so they can navigate
+	// while reviewing; only collapse it for students to maximise reading space.
+	if (!props.embedded && !isCourseAdmin()) {
+		sidebarStore.isSidebarCollapsed = true
+		collapsedByLesson = true
+	}
 	document.addEventListener('fullscreenchange', attachFullscreenEvent)
 	socket.on('update_lesson_progress', (data) => {
 		if (data.course === props.courseName) {
@@ -442,7 +445,8 @@ const attachFullscreenEvent = () => {
 
 onBeforeUnmount(() => {
 	document.removeEventListener('fullscreenchange', attachFullscreenEvent)
-	if (!props.embedded) sidebarStore.isSidebarCollapsed = false
+	if (!props.embedded && collapsedByLesson)
+		sidebarStore.isSidebarCollapsed = false
 	trackVideoWatchDuration()
 })
 
@@ -927,6 +931,33 @@ const checkIfDiscussionsAllowed = () => {
 const isAdmin = computed(() => {
 	let isInstructor = lesson.data?.instructors?.includes(user.data?.name)
 	return user.data?.is_moderator || isInstructor
+})
+
+// The video-statistics button only makes sense when the lesson actually has a
+// video; showing it for text-only lessons opened an empty modal and logged a
+// console error.
+const lessonHasVideo = computed(() => {
+	const data = lesson.data
+	if (!data) return false
+	if (data.youtube) return true
+	if (data.videos?.length) return true
+	if (data.body && /\{\{ (YouTubeVideo|Video)\(/.test(data.body)) return true
+	if (data.content) {
+		try {
+			const blocks = JSON.parse(data.content)?.blocks || []
+			return blocks.some(
+				(block) =>
+					block.type === 'embed' ||
+					(block.type === 'upload' &&
+						['mp4', 'webm', 'mov', 'mkv', 'm4v'].includes(
+							block.data?.file_type
+						))
+			)
+		} catch {
+			return false
+		}
+	}
+	return false
 })
 
 const allowInstructorContent = () => {

@@ -3,18 +3,18 @@
 		<div class="mt-0">
 			<div class="w-5/6 mx-auto pt-4">
 				<div
-					class="flex justify-between cursor-pointer"
+					class="flex items-center gap-1 w-fit cursor-pointer mb-1"
 					@click="
 						() => {
 							openInstructorEditor = !openInstructorEditor
 						}
 					"
 				>
-					<label class="block font-medium text-ink-gray-5 mb-1">
+					<label class="block font-medium text-ink-gray-5 cursor-pointer">
 						{{ __('Instructor Notes') }}
 					</label>
-					<ChevronRight
-						class="stroke-2 h-5 w-5 text-ink-gray-5 transform duration-200"
+					<span
+						class="lucide-chevron-right size-5 text-ink-gray-5 transform duration-200"
 						:class="{
 							'rotate-90': openInstructorEditor,
 							'rtl:rotate-180': !openInstructorEditor,
@@ -43,9 +43,15 @@
 </template>
 <script setup>
 import { createResource, toast } from 'frappe-ui'
-import { reactive, onMounted, inject, ref, onBeforeUnmount } from 'vue'
+import {
+	reactive,
+	onMounted,
+	inject,
+	ref,
+	onBeforeUnmount,
+	computed,
+} from 'vue'
 import EditorJS from '@editorjs/editorjs'
-import { ChevronRight } from 'lucide-vue-next'
 import { getEditorTools, enablePlyr, sanitizeEditorJs } from '@/utils'
 import { useOnboarding, useTelemetry } from 'frappe-ui/frappe'
 
@@ -53,6 +59,11 @@ const editor = ref(null)
 const instructorEditor = ref(null)
 const user = inject('$user')
 const openInstructorEditor = ref(false)
+const contentUploadContext = { docname: null, fieldname: 'content' }
+const instructorUploadContext = {
+	docname: null,
+	fieldname: 'instructor_content',
+}
 const { capture } = useTelemetry()
 const { updateOnboardingStep } = useOnboarding('learning')
 let autoSaveInterval
@@ -88,21 +99,24 @@ onMounted(() => {
 		window.location.href = '/login'
 	}
 	capture('lesson_form_opened')
-	editor.value = renderEditor('content')
-	instructorEditor.value = renderEditor('instructor-notes')
+	editor.value = renderEditor('content', contentUploadContext)
+	instructorEditor.value = renderEditor(
+		'instructor-notes',
+		instructorUploadContext
+	)
 	window.addEventListener('keydown', keyboardShortcut)
 	enablePlyr()
 })
 
-const renderEditor = (holder) => {
+const renderEditor = (holder, uploadContext = {}) => {
 	return new EditorJS({
 		holder: holder,
-		tools: getEditorTools(true),
+		tools: getEditorTools(false, uploadContext),
 		defaultBlock: 'markdown',
 		i18n: {
 			direction: document.documentElement.dir === 'rtl' ? 'rtl' : 'ltr',
 		},
-		onChange: async (api, event) => {
+		onChange: async () => {
 			enablePlyr()
 			markDirty()
 		},
@@ -133,6 +147,8 @@ const lessonDetails = createResource({
 			lesson.include_in_preview = data?.lesson?.include_in_preview
 				? true
 				: false
+			contentUploadContext.docname = data.lesson.name
+			instructorUploadContext.docname = data.lesson.name
 			addLessonContent(data)
 			addInstructorNotes(data)
 			enableAutoSave()

@@ -52,7 +52,7 @@
 							@click.stop="(e) => handleMarkAsRead(log.name)"
 						>
 							<template #icon>
-								<X class="h-4 w-4 text-ink-gray-7 stroke-1.5" />
+								<span class="lucide-x size-4 text-ink-gray-7" />
 							</template>
 						</Button>
 					</div>
@@ -102,7 +102,7 @@
 							v-if="log.document_details.start_date"
 							class="flex items-center gap-x-2 text-sm mt-5"
 						>
-							<Calendar class="size-3 stroke-1.5" />
+							<span class="lucide-calendar size-3" />
 							<span>
 								{{
 									dayjs(log.document_details.start_date).format('DD MMM YYYY')
@@ -113,7 +113,7 @@
 							v-if="log.document_details.start_time"
 							class="flex items-center gap-x-2 text-sm mt-2"
 						>
-							<Clock class="size-3 stroke-1.5" />
+							<span class="lucide-clock size-3" />
 							<span>
 								{{ formatTime(log.document_details.start_time) }}
 								{{ log.document_details.timezone }}
@@ -132,7 +132,7 @@
 									:image="instructor.user_image"
 									:label="instructor.full_name"
 								/>
-								<span class="font-medium text-sm text-ink-gray-9">
+								<span class="text-sm-medium text-ink-gray-9">
 									{{ instructor.full_name }}
 								</span>
 							</div>
@@ -141,23 +141,14 @@
 				</div>
 			</div>
 		</div>
-		<div v-else class="flex flex-col items-center justify-center mt-60">
-			<Bell class="size-10 mx-auto stroke-1 text-ink-gray-5" />
-			<p class="text-lg font-semibold text-ink-gray-7 mb-2.5">
-				{{
-					activeTab === 'Unread'
-						? __('No unread notifications')
-						: __('No read notifications')
-				}}
-			</p>
-			<p class="text-p-base w-full md:w-2/5 text-center text-ink-gray-7">
-				{{
-					activeTab === 'Unread'
-						? __("You're all caught up! Check back later for updates.")
-						: __('Notifications you have read will appear here.')
-				}}
-			</p>
-		</div>
+		<EmptyStateLayout
+			v-else
+			name="Notifications"
+			:title="emptyTitle"
+			:description="emptyDescription"
+			:icon="Bell"
+			width="lg"
+		/>
 	</div>
 </template>
 <script setup>
@@ -174,9 +165,10 @@ import {
 import { sessionStore } from '../stores/session'
 import { computed, inject, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Bell, Calendar, Clock, X } from 'lucide-vue-next'
+import { Bell } from 'lucide-vue-next'
 import { formatTime } from '@/utils/'
 import LayoutHeader from '@/components/Layouts/LayoutHeader.vue'
+import EmptyStateLayout from '@/components/Layouts/EmptyStateLayout.vue'
 
 const { brand } = sessionStore()
 const dayjs = inject('$dayjs')
@@ -198,6 +190,18 @@ const notifications = computed(() => {
 		? unReadNotifications.data
 		: readNotifications.data
 })
+
+const emptyTitle = computed(() =>
+	activeTab.value === 'Unread'
+		? __('No unread notifications')
+		: __('No read notifications')
+)
+
+const emptyDescription = computed(() =>
+	activeTab.value === 'Unread'
+		? __("You're all caught up! Check back later for updates.")
+		: __('Notifications you have read will appear here.')
+)
 
 const unReadNotifications = createListResource({
 	doctype: 'Notification Log',
